@@ -1,4 +1,8 @@
+import re
 import unicodedata
+from datetime import date
+
+from app.database import buscar_pedido
 
 
 def normalizar_texto(texto: str) -> str:
@@ -15,37 +19,65 @@ def normalizar_texto(texto: str) -> str:
 
 def gerar_resposta(mensagem: str) -> str:
     texto = normalizar_texto(mensagem)
-    palavras = texto.split()
 
     if not texto:
         return "Por favor, digite uma mensagem."
 
-    if "pedido" in texto:
-        return (
-            "Posso ajudar a consultar seu pedido! "
-            "Em breve teremos essa funcionalidade."
+    # Consulta de pedidos
+    if re.search(r"\bpedido\b", texto):
+
+        resultado = re.search(
+            r"\bpedido\s*(?:numero\s*)?#?\s*(\d+)\b",
+            texto
         )
 
-    elif "entrega" in texto or "prazo" in texto:
+        if resultado is None:
+            return (
+                "Claro! Informe o número do pedido. "
+                "Exemplo: pedido 1001."
+            )
+
+        codigo = resultado.group(1)
+
+        pedido = buscar_pedido(codigo)
+
+        if pedido is None:
+            return (
+                f"Não encontrei o pedido {codigo}. "
+                "Verifique o número informado."
+            )
+
+        previsao = date.fromisoformat(
+            pedido["previsao_entrega"]
+        ).strftime("%d/%m/%Y")
+
+        return (
+            f"Encontrei seu pedido! "
+            f"Pedido: {pedido['codigo']}. "
+            f"Status: {pedido['status']}. "
+            f"Previsão de entrega: {previsao}."
+        )
+
+    # Perguntas frequentes
+    if "entrega" in texto or "prazo" in texto:
         return (
             "O prazo de entrega varia de acordo "
             "com a modalidade de envio."
         )
 
-    elif "horario" in texto:
+    if "horario" in texto:
         return (
             "Nosso atendimento funciona de "
             "segunda a sexta, das 8h às 18h."
         )
 
-    elif "oi" in palavras or "ola" in palavras:
+    if re.search(r"\b(oi|ola)\b", texto):
         return (
             "Olá! Sou o AtendeIA. "
             "Como posso ajudar você?"
         )
 
-    else:
-        return (
-            "Desculpe, não entendi sua pergunta. "
-            "Pode reformular?"
-        )
+    return (
+        "Desculpe, não entendi sua pergunta. "
+        "Pode reformular?"
+    )
